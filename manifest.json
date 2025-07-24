@@ -1,5 +1,5 @@
 {
-  "name": "Bilge & Alp Akıllı Asistan",
+  "name": "Bilge &amp; Alp Akıllı Asistan",
   "short_name": "Bilge",
   "description": "Akıllı araç asistanı",
   "start_url": "/bilge/",
@@ -21,7 +21,10 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "lang": "tr",
   "dir": "ltr",
   "scope": "/bilge/",
