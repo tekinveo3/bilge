@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BİLGE & ALP V5.1 - Tam ve Eksiksiz Sürüm</title>
+    
     <!-- PWA için gerekli meta taglar -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2e86ab">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2e86ab">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -374,7 +379,6 @@
                     });
                 },
 
-                // ... Diğer tüm metotlar (switchPersona, panel gizleme vs.) buraya eklenecek...
                 toggleMapsPanel: () => App.UI.mainLayout.classList.toggle('main-layout--maps-closed', !App.UI.toggleMaps.checked),
                 toggleSpotifyPanel: () => App.UI.mainLayout.classList.toggle('main-layout--spotify-closed', !App.UI.toggleSpotify.checked),
                 switchPersona: () => {
