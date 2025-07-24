@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BİLGE & ALP V5.1 - Tam ve Eksiksiz Sürüm</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <style>
+        /* =================================================================
+           1. TEMEL DEĞİŞKENLER VE KURULUM
+           ================================================================= */
+        :root {
+            --bg-base: #0A0A0F; --bg-panel: #121218; --border-color: rgba(255, 255, 255, 0.1);
+            --text-primary: #ECEFF1; --text-secondary: rgba(236, 239, 241, 0.7);
+            --color-success: #4CAF50; --color-warning: #FFC107; --color-danger: #F44336;
+            --color-spotify: #1DB954; --color-maps: #4285F4;
+            --transition-speed-fast: 0.2s; --transition-speed-medium: 0.4s;
+            --transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body, body.theme-bilge {
+            --theme-primary: #2e86ab; --theme-primary-glow: rgba(46, 134, 171, 0.5);
+            --theme-gradient: radial-gradient(ellipse at 50% 50%, #1a1a2e 0%, var(--bg-base) 80%);
+        }
+        body.theme-alp {
+            --theme-primary: #e74c3c; --theme-primary-glow: rgba(231, 76, 60, 0.5);
+            --theme-gradient: radial-gradient(ellipse at 50% 50%, #2e1a1a 0%, var(--bg-base) 80%);
+        }
+
+        /* =================================================================
+           2. GENEL STİLLER & YÜKLEME EKRANI
+           ================================================================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Roboto', sans-serif; }
+        body { background: #000; color: var(--text-primary); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; overflow: hidden;}
+        
+        .preloader { position: fixed; inset: 0; background: var(--bg-base); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: opacity 0.5s ease, visibility 0.5s ease; }
+        .preloader.is-hidden { opacity: 0; visibility: hidden; }
+        .preloader__logo { font-size: 50px; font-weight: bold; color: var(--theme-primary); animation: pulse-logo 2s infinite ease-in-out; }
+        @keyframes pulse-logo { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } }
+
+        /* =================================================================
+           3. ANA KONTEYNER & DURUM ÇUBUĞU
+           ================================================================= */
+        .car-ui-container { width: 1280px; height: 800px; background: var(--bg-base); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75); position: relative; display: flex; flex-direction: column; }
+        .status-bar { flex-shrink: 0; height: 50px; background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-size: 14px; border-bottom: 1px solid var(--border-color); z-index: 100; }
+        .status-bar__section { display: flex; gap: 24px; align-items: center; }
+        .status-bar-button { background: rgba(255,255,255,0.1); border: none; color: var(--text-secondary); padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all var(--transition-speed-fast); font-weight: 500;}
+        .status-bar-button:hover { background: rgba(255,255,255,0.2); color: var(--text-primary); }
+        .persona-switcher { cursor: pointer; font-size: 22px; transition: transform var(--transition-speed-medium); }
+        .persona-switcher:hover { transform: scale(1.1) rotate(10deg); }
+        .status-bar__indicator-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--theme-primary); transition: background-color var(--transition-speed-medium); }
+        .toggle-switch { display: flex; align-items: center; gap: 8px; }
+        .toggle-switch__label { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .toggle-switch__input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch__slider { position: absolute; cursor: pointer; inset: 0; background-color: #333; transition: var(--transition-speed-medium); border-radius: 20px; }
+        .toggle-switch__slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: var(--transition-speed-medium); border-radius: 50%; }
+        .toggle-switch__input:checked + .toggle-switch__slider { background-color: var(--color-maps); }
+        #toggle-spotify:checked + .toggle-switch__slider { background-color: var(--color-spotify); }
+        .toggle-switch__input:checked + .toggle-switch__slider:before { transform: translateX(14px); }
+        
+        /* =================================================================
+           4. ANA YERLEŞİM (DASHBOARD)
+           ================================================================= */
+        .main-layout { flex-grow: 1; display: grid; grid-template: "maps main-panel" 1fr "spotify spotify" 120px / 1fr 400px; gap: 2px; }
+        .panel { background-color: var(--bg-panel); transition: opacity var(--transition-speed-medium), transform var(--transition-speed-medium); }
+        .main-layout--maps-closed { grid-template-columns: 0px 1fr; }
+        .main-layout--spotify-closed { grid-template-rows: 1fr 0px; }
+        .main-layout--maps-closed .maps-panel, .main-layout--spotify-closed .spotify-panel { opacity: 0; transform: scale(0.95); pointer-events: none; }
+        .main-layout--maps-closed .main-panel, .main-layout--maps-closed .spotify-panel { grid-column: 1 / -1; }
+
+        /* 4.1 HARİTA PANELİ */
+        .maps-panel { grid-area: maps; position: relative; background: #1d2633; }
+        #map { width: 100%; height: 100%; z-index: 1; filter: grayscale(1) brightness(0.8) contrast(1.2); }
+        .leaflet-control-container { display: none; } 
+        .nav-overlay { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; min-width: 300px; z-index: 2; }
+        .nav-direction { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .nav-arrow { width: 50px; height: 50px; background: var(--color-maps); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .nav-distance { font-size: 24px; font-weight: 600; }
+        .nav-street { font-size: 16px; opacity: 0.8; }
+        .nav-eta { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; font-size: 14px; }
+        .location-marker-icon { width: 24px; height: 24px; background: var(--color-maps); border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 10px rgba(66, 133, 244, 0.2); animation: pulse-location 2s infinite; }
+        @keyframes pulse-location { to { box-shadow: 0 0 0 25px rgba(66, 133, 244, 0); } }
+
+        /* 4.2 BİLGE/ALP ANA PANELİ */
+        .main-panel { grid-area: main-panel; background: var(--theme-gradient); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; text-align: center; }
+        .particles { position: absolute; inset: 0; overflow: hidden; }
+        .particle { position: absolute; border-radius: 50%; background: var(--theme-primary); }
+        .bilge-particle { width: 3px; height: 3px; opacity: 0.6; animation: float-up 15s linear infinite; }
+        @keyframes float-up { from { transform: translateY(100vh) scale(0); opacity: 0; } 10% { opacity: 1; } to { transform: translateY(-100px) scale(1); opacity: 0; } }
+        .alp-particle { width: 1px; height: 60px; opacity: 0.8; animation: streak-up 4s linear infinite; }
+        @keyframes streak-up { from { transform: translateY(100vh) scaleY(0.5); opacity: 0; } 20% { opacity: 1; } to { transform: translateY(-100px) scaleY(1); opacity: 0; } }
+        .orb { width: 180px; height: 180px; margin: 0 auto 30px; position: relative; }
+        .orb-center { width: 100%; height: 100%; background: radial-gradient(circle, var(--theme-primary-glow), rgba(46,134,171,0.05)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: var(--theme-primary); animation: breathe 4s ease-in-out infinite; }
+        @keyframes breathe { 0%, 100% { transform: scale(1); box-shadow: 0 0 40px var(--theme-primary-glow); } 50% { transform: scale(1.05); box-shadow: 0 0 60px var(--theme-primary-glow); } }
+        .orb-ring { position: absolute; inset: -20px; border: 2px solid var(--theme-primary-glow); border-radius: 50%; animation: rotate-ring 10s linear infinite; }
+        @keyframes rotate-ring { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .panel-title { font-size: 32px; margin-bottom: 10px; }
+        .panel-status { font-size: 16px; color: var(--text-secondary); margin-bottom: 30px; }
+        .voice-visualizer { display: flex; gap: 4px; height: 60px; align-items: flex-end; justify-content: center; }
+        .voice-line { width: 3px; background: linear-gradient(to top, var(--theme-primary), transparent); border-radius: 2px; transition: height 0.2s ease; }
+
+        /* 4.3 SPOTIFY PANELİ */
+        .spotify-panel { grid-area: spotify; display: flex; align-items: center; padding: 0 30px; gap: 30px; border-top: 1px solid var(--border-color); }
+        .album-cover { width: 80px; height: 80px; background: linear-gradient(135deg, #1DB954, #1ed760); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 4px 20px rgba(29,185,84,0.3); flex-shrink: 0; }
+        .track-info { flex: 1; min-width: 0; }
+        .track-name { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .artist-name { font-size: 14px; opacity: 0.7; }
+        .progress-container { flex: 2; max-width: 400px; }
+        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .progress-fill { height: 100%; width: 35%; background: var(--color-spotify); }
+        .media-controls button { background: none; border: none; color: white; cursor: pointer; opacity: 0.8; font-size: 24px; }
+        
+        /* =================================================================
+           5. ARAÇ MERKEZİ (VEHICLE HUB)
+           ================================================================= */
+        .vehicle-hub-overlay { position: absolute; inset: 0; background: rgba(10, 10, 15, 0.8); backdrop-filter: blur(20px); z-index: 200; display: flex; padding: 40px; transform: scale(1.1); opacity: 0; pointer-events: none; transition: transform var(--transition-speed-medium), opacity var(--transition-speed-medium); }
+        .vehicle-hub-overlay.is-active { transform: scale(1); opacity: 1; pointer-events: all; }
+        .hub-close-button { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 50%; font-size: 20px; cursor: pointer; line-height: 40px; text-align: center; }
+        .hub-nav { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding-right: 30px; border-right: 1px solid var(--border-color); }
+        .hub-nav-item { width: 100%; padding: 15px 20px; background: transparent; border: none; color: var(--text-secondary); font-size: 16px; text-align: left; border-radius: 8px; cursor: pointer; transition: all var(--transition-speed-fast); }
+        .hub-nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+        .hub-nav-item.is-active { background: var(--theme-primary); color: white; font-weight: 600; }
+        .hub-content { flex-grow: 1; padding-left: 40px; position: relative; }
+        .hub-panel { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity var(--transition-speed-medium); }
+        .hub-panel.is-active { opacity: 1; visibility: visible; }
+        .hub-panel__title { font-size: 32px; margin-bottom: 30px; font-weight: 600; color: var(--theme-primary); }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .info-card { background: var(--bg-panel); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); transform: translateY(20px); opacity: 0; animation: fade-in-up 0.5s var(--transition-timing-function) forwards; }
+        @keyframes fade-in-up { to { transform: translateY(0); opacity: 1; } }
+        .info-card__label { font-size: 14px; color: var(--text-secondary); margin-bottom: 10px; }
+        .info-card__value { font-size: 28px; font-weight: 500; }
+        .info-card__value .ok { color: var(--color-success); }
+        .scan-button { background: var(--theme-primary); color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; margin-bottom: 30px; }
+        .scan-results__item { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .scan-results__status { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .scan-results__status.pending { background: var(--color-warning); animation: pulse 1.5s infinite; }
+        .scan-results__status.ok { background: var(--color-success); }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .waveform-container { background: var(--bg-panel); height: 200px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 4px; overflow: hidden; }
+        .waveform-bar { width: 4px; height: 10%; background: var(--theme-primary); border-radius: 2px; animation: wave 1.5s ease-in-out infinite alternate; }
+        @keyframes wave { to { height: 90%; } }
+    </style>
+</head>
+<body class="theme-bilge">
+
+    <div class="preloader" id="preloader">
+        <div class="preloader__logo">B&A</div>
+    </div>
+
+    <div class="car-ui-container">
+        <header class="status-bar">
+             <div class="status-bar__section">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="status-bar__indicator-dot"></div>
+                    <span id="persona-name-label">Bilge</span>
+                </div>
+                <div class="persona-switcher" id="persona-switcher" title="Kişiliği Değiştir">🎭</div>
+                <div class="toggle-switch">
+                    <label class="toggle-switch__label">
+                        <input type="checkbox" id="toggle-maps" checked>
+                        <span class="toggle-switch__slider"></span>
+                    </label>
+                    <span>Maps</span>
+                </div>
+                <div class="toggle-switch">
+                    <label class="toggle-switch__label">
+                        <input type="checkbox" id="toggle-spotify" checked>
+                        <span class="toggle-switch__slider"></span>
+                    </label>
+                    <span>Spotify</span>
+                </div>
+                <button class="status-bar-button" id="open-vehicle-hub-btn">Aracım 🚘</button>
+            </div>
+            <div class="status-bar__section">
+                <span>16:42</span>
+                <span>82% 🔋</span>
+            </div>
+        </header>
+
+        <main class="main-layout" id="main-layout">
+            <section class="panel maps-panel">
+                <div id="map"></div>
+                <div class="nav-overlay">
+                    <div class="nav-direction">
+                        <div class="nav-arrow">↗️</div>
+                        <div>
+                            <div class="nav-distance">300 m</div>
+                            <div class="nav-street">Bağdat Caddesi'nden sağa</div>
+                        </div>
+                    </div>
+                    <div class="nav-eta">
+                        <span>12 dk • 5.2 km</span>
+                        <span>Varış: 16:54</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel main-panel">
+                <div class="particles" id="particles-container"></div>
+                <div>
+                    <div class="orb">
+                        <div class="orb-ring"></div>
+                        <div class="orb-center" id="orb-letter">B</div>
+                    </div>
+                    <h2 class="panel-title" id="panel-title">Bilge</h2>
+                    <p class="panel-status" id="panel-status">Seni dinliyorum...</p>
+                    <div class="voice-visualizer"></div>
+                </div>
+            </section>
+
+            <footer class="panel spotify-panel">
+                 <div class="album-cover">🎵</div>
+                 <div class="track-info">
+                     <div class="track-name">Bir Başka Güzel</div>
+                     <div class="artist-name">Sezen Aksu</div>
+                 </div>
+                 <div class="progress-container">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; opacity: 0.7;"><span >1:42</span><span>4:51</span></div>
+                    <div class="progress-bar"><div class="progress-fill"></div></div>
+                 </div>
+                 <div class="media-controls" style="display: flex; gap: 15px; align-items: center;">
+                     <button>⏮️</button>
+                     <button style="width: 50px; height: 50px; background: white; color: black; border-radius: 50%;">⏸️</button>
+                     <button>⏭️</button>
+                 </div>
+            </footer>
+        </main>
+        
+        <div class="vehicle-hub-overlay" id="vehicle-hub">
+            <button class="hub-close-button" id="close-vehicle-hub-btn">✕</button>
+            <nav class="hub-nav" id="hub-nav">
+                <button class="hub-nav-item is-active" data-panel="overview">Genel Bakış</button>
+                <button class="hub-nav-item" data-panel="scan">Sistem Taraması</button>
+                <button class="hub-nav-item" data-panel="powertrain">Motor & Batarya</button>
+                <button class="hub-nav-item" data-panel="acoustic">Akustik Teşhis</button>
+            </nav>
+            <div class="hub-content">
+                <div class="hub-panel is-active" id="panel-overview">
+                    <h2 class="hub-panel__title">Genel Bakış</h2>
+                    <div class="overview-grid">
+                        <div class="info-card"><div class="info-card__label">Model</div><div class="info-card__value">Togg T10X</div></div>
+                        <div class="info-card"><div class="info-card__label">Batarya</div><div class="info-card__value">78%</div></div>
+                        <div class="info-card"><div class="info-card__label">Tahmini Menzil</div><div class="info-card__value">420 km</div></div>
+                        <div class="info-card"><div class="info-card__label">Yazılım</div><div class="info-card__value">v5.1.0</div></div>
+                        <div class="info-card"><div class="info-card__label">Lastik Basıncı</div><div class="info-card__value ok">Normal</div></div>
+                        <div class="info-card"><div class="info-card__label">Sistem Durumu</div><div class="info-card__value ok">Sorun Yok</div></div>
+                    </div>
+                </div>
+                <div class="hub-panel" id="panel-scan">
+                    <h2 class="hub-panel__title">Sistem Taraması</h2>
+                    <button class="scan-button" id="start-scan-btn">Taramayı Başlat</button>
+                    <div class="scan-results" id="scan-results-container"></div>
+                </div>
+                <div class="hub-panel" id="panel-powertrain">
+                    <h2 class="hub-panel__title">Motor & Batarya Durumu</h2>
+                     <div class="overview-grid">
+                        <div class="info-card"><div class="info-card__label">Motor Sıcaklığı</div><div class="info-card__value">45°C</div></div>
+                        <div class="info-card"><div class="info-card__label">Anlık Güç Çıkışı</div><div class="info-card__value">32 kW</div></div>
+                        <div class="info-card"><div class="info-card__label">Batarya Sağlığı</div><div class="info-card__value">98%</div></div>
+                     </div>
+                </div>
+                <div class="hub-panel" id="panel-acoustic">
+                    <h2 class="hub-panel__title">Akustik Teşhis (Ses Dinleme)</h2>
+                    <div class="waveform-container"></div>
+                    <p style="margin-top: 20px; color: var(--text-secondary);">Sistem, anormal mekanik sesleri dinliyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const App = {
+                // --- UI ELEMENTLERİ ---
+                UI: {
+                    preloader: document.getElementById('preloader'),
+                    body: document.body,
+                    mainLayout: document.getElementById('main-layout'),
+                    toggleMaps: document.getElementById('toggle-maps'),
+                    toggleSpotify: document.getElementById('toggle-spotify'),
+                    personaSwitcher: document.getElementById('persona-switcher'),
+                    particlesContainer: document.getElementById('particles-container'),
+                    orbLetter: document.getElementById('orb-letter'),
+                    panelTitle: document.getElementById('panel-title'),
+                    panelStatus: document.getElementById('panel-status'),
+                    personaNameLabel: document.getElementById('persona-name-label'),
+                    voiceVisualizer: document.querySelector('.voice-visualizer'),
+                    vehicleHub: document.getElementById('vehicle-hub'),
+                    openHubBtn: document.getElementById('open-vehicle-hub-btn'),
+                    closeHubBtn: document.getElementById('close-vehicle-hub-btn'),
+                    hubNav: document.getElementById('hub-nav'),
+                    hubPanels: document.querySelectorAll('.hub-panel'),
+                    startScanBtn: document.getElementById('start-scan-btn'),
+                    scanResultsContainer: document.getElementById('scan-results-container'),
+                    waveformContainer: document.querySelector('.waveform-container')
+                },
+                
+                // --- UYGULAMA VERİSİ ---
+                state: {
+                    currentPersona: 'bilge',
+                    map: null,
+                },
+                data: {
+                    systemsToScan: ['ECU', 'Fren Sistemi', 'Batarya Yönetimi', 'Şasi Kontrol', 'Hava Yastıkları', 'Multimedya'],
+                },
+
+                // --- METOTLAR ---
+                initMap() {
+                    if(!document.getElementById('map')) return;
+                    this.state.map = L.map('map', {zoomControl: false}).setView([41.0282, 28.9784], 14);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+                    }).addTo(this.state.map);
+                    const routeLatLngs = [ [41.02, 28.96], [41.03, 28.98], [41.025, 29.00] ];
+                    L.polyline(routeLatLngs, {color: 'var(--color-maps)', weight: 6, opacity: 0.8}).addTo(this.state.map);
+                    const locationIcon = L.divIcon({ className: 'location-marker-icon' });
+                    L.marker([41.02, 28.96], {icon: locationIcon}).addTo(this.state.map);
+                },
+
+                staggerAnimation(elements) {
+                    elements.forEach((el, index) => {
+                        el.style.animation = 'none';
+                        el.offsetHeight; // Reflow tetikle
+                        el.style.animation = '';
+                        el.style.animationDelay = `${index * 100}ms`;
+                    });
+                },
+
+                openHub() {
+                    App.UI.vehicleHub.classList.add('is-active');
+                    const firstPanelCards = App.UI.vehicleHub.querySelector('.hub-panel.is-active .overview-grid');
+                    if(firstPanelCards) {
+                        App.staggerAnimation(firstPanelCards.children);
+                    }
+                },
+                closeHub() {
+                    App.UI.vehicleHub.classList.remove('is-active');
+                },
+                
+                switchHubPanel(e) {
+                    if (e.target.matches('.hub-nav-item')) {
+                        App.UI.hubNav.querySelector('.is-active').classList.remove('is-active');
+                        e.target.classList.add('is-active');
+                        const targetPanelId = `panel-${e.target.dataset.panel}`;
+                        App.UI.hubPanels.forEach(p => {
+                            p.classList.remove('is-active');
+                            if(p.id === targetPanelId) {
+                                p.classList.add('is-active');
+                                const cards = p.querySelector('.overview-grid');
+                                if(cards) App.staggerAnimation(cards.children);
+                            }
+                        });
+                    }
+                },
+                
+                startSystemScan() {
+                    App.UI.scanResultsContainer.innerHTML = '';
+                    App.data.systemsToScan.forEach((system, index) => {
+                        setTimeout(() => {
+                            const item = document.createElement('div');
+                            item.className = 'scan-results__item';
+                            item.innerHTML = `<div class="scan-results__status pending"></div><span>${system} kontrol ediliyor...</span>`;
+                            App.UI.scanResultsContainer.appendChild(item);
+                            setTimeout(() => {
+                                item.querySelector('.scan-results__status').className = 'scan-results__status ok';
+                                item.querySelector('span').textContent = `${system} - Durum: Normal`;
+                            }, 1000);
+                        }, index * 1200);
+                    });
+                },
+
+                // ... Diğer tüm metotlar (switchPersona, panel gizleme vs.) buraya eklenecek...
+                toggleMapsPanel: () => App.UI.mainLayout.classList.toggle('main-layout--maps-closed', !App.UI.toggleMaps.checked),
+                toggleSpotifyPanel: () => App.UI.mainLayout.classList.toggle('main-layout--spotify-closed', !App.UI.toggleSpotify.checked),
+                switchPersona: () => {
+                    App.state.currentPersona = (App.state.currentPersona === 'bilge') ? 'alp' : 'bilge';
+                    App.setPersona(App.state.currentPersona);
+                },
+                setPersona: (persona) => {
+                    App.UI.body.className = `theme-${persona}`;
+                    const config = persona === 'bilge' 
+                        ? { letter: 'B', title: 'Bilge', status: 'Seni dinliyorum...' }
+                        : { letter: 'A', title: 'Alp', status: 'Komut bekleniyor.' };
+                    App.UI.orbLetter.textContent = config.letter;
+                    App.UI.panelTitle.textContent = config.title;
+                    App.UI.panelStatus.textContent = config.status;
+                    App.UI.personaNameLabel.textContent = config.title;
+                    App.generateParticles(persona);
+                },
+                generateParticles: (persona) => {
+                    if(!App.UI.particlesContainer) return;
+                    App.UI.particlesContainer.innerHTML = '';
+                    const isBilge = persona === 'bilge';
+                    const options = { count: isBilge ? 20 : 40, className: isBilge ? 'bilge-particle' : 'alp-particle', baseDuration: isBilge ? 10 : 2, durationVariation: isBilge ? 10 : 2 };
+                    for (let i = 0; i < options.count; i++) {
+                        const p = document.createElement('div');
+                        p.className = `particle ${options.className}`;
+                        p.style.left = `${Math.random() * 100}%`;
+                        p.style.animationDelay = `${Math.random() * 15}s`;
+                        p.style.animationDuration = `${options.baseDuration + Math.random() * options.durationVariation}s`;
+                        App.UI.particlesContainer.appendChild(p);
+                    }
+                },
+                initVoiceVisualizer: () => {
+                    if(!App.UI.voiceVisualizer) return;
+                    for(let i=0; i<15; i++) App.UI.voiceVisualizer.appendChild(document.createElement('div')).className = 'voice-line';
+                    setInterval(() => Array.from(App.UI.voiceVisualizer.children).forEach(l => l.style.height = `${Math.random()*50+10}px`), 200);
+                },
+                initWaveform: () => {
+                    if(!App.UI.waveformContainer) return;
+                    App.UI.waveformContainer.innerHTML = '';
+                    for(let i=0; i<50; i++) {
+                        const bar = document.createElement('div');
+                        bar.className = 'waveform-bar';
+                        bar.style.animationDelay = `${Math.random()*-1.5}s`;
+                        App.UI.waveformContainer.appendChild(bar);
+                    }
+                },
+                
+                bindEvents() {
+                    App.UI.toggleMaps.addEventListener('change', App.toggleMapsPanel);
+                    App.UI.toggleSpotify.addEventListener('change', App.toggleSpotifyPanel);
+                    App.UI.personaSwitcher.addEventListener('click', App.switchPersona);
+                    App.UI.openHubBtn.addEventListener('click', App.openHub);
+                    App.UI.closeHubBtn.addEventListener('click', App.closeHub);
+                    App.UI.hubNav.addEventListener('click', App.switchHubPanel);
+                    App.UI.startScanBtn.addEventListener('click', App.startSystemScan);
+                },
+
+                init() {
+                    this.bindEvents();
+                    this.setPersona(this.state.currentPersona);
+                    this.initVoiceVisualizer();
+                    this.initWaveform();
+                    this.initMap();
+                    
+                    window.setTimeout(() => {
+                        this.UI.preloader.classList.add('is-hidden');
+                    }, 500);
+                }
+            };
+
+            App.init();
+        });
+    </script>
+</body>
+</html>
